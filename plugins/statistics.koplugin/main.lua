@@ -9,6 +9,7 @@ local DocSettings = require("docsettings")
 local FFIUtil = require("ffi/util")
 local InfoMessage = require("ui/widget/infomessage")
 local KeyValuePage = require("ui/widget/keyvaluepage")
+local RenderImage = require("ui/renderimage")
 local Math = require("optmath")
 local ReaderFooter = require("apps/reader/modules/readerfooter")
 local ReaderProgress = require("readerprogress")
@@ -16,12 +17,14 @@ local ReadHistory = require("readhistory")
 local Screensaver = require("ui/screensaver")
 local SQ3 = require("lua-ljsqlite3/init")
 local SyncService = require("frontend/apps/cloudstorage/syncservice")
+local FileManagerBookInfo = require("apps/filemanager/filemanagerbookinfo")
 local UIManager = require("ui/uimanager")
 local Widget = require("ui/widget/widget")
 local datetime = require("datetime")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
 local util = require("util")
+local ffi = require("ffi")
 local _ = require("gettext")
 local C_ = _.pgettext
 local N_ = _.ngettext
@@ -1357,6 +1360,39 @@ Time is in hours and minutes.]]),
                     self:onShowCalendarDayView()
                 end,
             },
+            {
+                text = _("Write book cover as png"),
+                keep_menu_open = true,
+                callback = function()
+                    -- local doc_settings =  self.ui.doc_settings
+                    local cover_bb = FileManagerBookInfo:getCoverImage(self.document)
+                    if cover_bb then
+                        local cbb_w, cbb_h = cover_bb:getWidth(), cover_bb:getHeight()
+                        local ok = pcall(cover_bb.writePNG, cover_bb, "/mnt/f/test.png")
+                        if ok then
+                            logger.dbg("OK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", cover_bb, cbb_w, cbb_h)
+                        end
+                    --     C.free(data) -- free the userdata we got from crengine
+                    --     return image
+                    -- if cover_bb then
+                    --     -- we should scale down the cover to our max size
+                    --     local cbb_w, cbb_h = cover_bb:getWidth(), cover_bb:getHeight()
+                        
+                        -- local buffer = ffi.cast("unsigned char*", cover_bb)
+                        -- local header = ffi.string(buffer, math.min(4, cover_bb))
+                        -- logger.dbg("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", header)
+
+                        -- local file = io.open("/mnt/f/test.png", "wb")
+                        -- if not file then
+                        --   error("could not open file for writing: " .. filename)
+                        -- end
+                        -- file:write(cover_bb)
+                      
+                        -- file:close()
+                    end
+                end,
+                enabled_func = function() return self:isEnabled() end,
+            }
         },
     }
 end
