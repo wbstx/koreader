@@ -1364,32 +1364,18 @@ Time is in hours and minutes.]]),
                 text = _("Write book cover as png"),
                 keep_menu_open = true,
                 callback = function()
-                    -- local doc_settings =  self.ui.doc_settings
-                    local cover_bb = FileManagerBookInfo:getCoverImage(self.document)
-                    if cover_bb then
-                        local cbb_w, cbb_h = cover_bb:getWidth(), cover_bb:getHeight()
-                        local ok = pcall(cover_bb.writePNG, cover_bb, "/mnt/f/test.png")
-                        if ok then
-                            logger.dbg("OK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", cover_bb, cbb_w, cbb_h)
-                        end
-                    --     C.free(data) -- free the userdata we got from crengine
-                    --     return image
+                    -- local cover_bb = FileManagerBookInfo:getCoverImage(self.document)
                     -- if cover_bb then
-                    --     -- we should scale down the cover to our max size
                     --     local cbb_w, cbb_h = cover_bb:getWidth(), cover_bb:getHeight()
-                        
-                        -- local buffer = ffi.cast("unsigned char*", cover_bb)
-                        -- local header = ffi.string(buffer, math.min(4, cover_bb))
-                        -- logger.dbg("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", header)
+                    --     local ok = pcall(cover_bb.writePNG, cover_bb, "/mnt/f/test.png")
+                    --     if ok then
+                    --         logger.dbg("OK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", cover_bb, cbb_w, cbb_h)
+                    --     end
+                    -- end
 
-                        -- local file = io.open("/mnt/f/test.png", "wb")
-                        -- if not file then
-                        --   error("could not open file for writing: " .. filename)
-                        -- end
-                        -- file:write(cover_bb)
-                      
-                        -- file:close()
-                    end
+                    local doc_settings =  self.ui.doc_settings
+                    logger.dbg("!!!!!!!!!!!!!!!!!!!", self.ui.doc_settings:readSetting("summary").modified, "!!!!!!!!!!!!!!!!!")
+
                 end,
                 enabled_func = function() return self:isEnabled() end,
             }
