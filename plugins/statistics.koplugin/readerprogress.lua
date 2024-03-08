@@ -20,6 +20,7 @@ local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
 local datetime = require("datetime")
 local _ = require("gettext")
+local BottomContainer = require("ui/widget/container/bottomcontainer")
 local Screen = Device.screen
 
 local LINE_COLOR = Blitbuffer.COLOR_GRAY_9
@@ -190,6 +191,126 @@ function ReaderProgress:genDoubleHeader(title_left, title_right)
             padding_span,
         },
         VerticalSpan:new{ width = Size.span.vertical_large, height = self.screen_height * (1/25) },
+    }
+end
+
+function ReaderProgress:genWeekStats2(stats_day)
+    local second_in_day = 86400
+    local date_format_show
+    local select_day_time
+    local diff_time
+    local now_time = os.time()
+    local user_duration_format = G_reader_settings:readSetting("duration_format")
+    local height = Screen:scaleBySize(60)
+    local statistics_container = CenterContainer:new{
+        dimen = Geom:new{ w = self.screen_width , h = height },
+    }
+    -- local statistics_group = VerticalGroup:new{ align = "left" }
+    local statistics_group = HorizontalGroup:new{ align = "bottom" }
+
+    local max_week_time = -1
+    local day_time
+    for i=1, stats_day do
+        day_time = self.dates[i][2]
+        if day_time > max_week_time then max_week_time = day_time end
+    end
+    local top_padding_span = HorizontalSpan:new{ width = Screen:scaleBySize(15) }
+    local top_span_group = HorizontalGroup:new{
+        align = "center",
+        LeftContainer:new{
+            dimen = Geom:new{ h = Screen:scaleBySize(30) },
+            top_padding_span
+        },
+    }
+    table.insert(statistics_group, top_span_group)
+
+    local padding_span = HorizontalSpan:new{ width = Screen:scaleBySize(15) }
+    local span_group = HorizontalGroup:new{
+        align = "center",
+        LeftContainer:new{
+            dimen = Geom:new{ h = Screen:scaleBySize(self.stats_span) },
+            padding_span
+        },
+    }
+
+    -- Lines have L/R self.padding. Make this section even more indented/padded inside the lines
+    local inner_width = self.screen_width - 4*self.padding
+    local j = 1
+    for i = 1, stats_day do
+        diff_time = now_time - second_in_day * (i - 1)
+        if self.dates[j][3] == os.date("%Y-%m-%d", diff_time) then
+            select_day_time = self.dates[j][2]
+            j = j + 1
+        else
+            select_day_time = 0
+        end
+        date_format_show = datetime.shortDayOfWeekToLongTranslation[os.date("%a", diff_time)] .. os.date(" (%Y-%m-%d)", diff_time)
+        local total_group = HorizontalGroup:new{
+            align = "center",
+            LeftContainer:new{
+                dimen = Geom:new{ w = inner_width , h = height * (1/3) },
+                TextWidget:new{
+                    padding = Size.padding.small,
+                    text = date_format_show .. " — " .. datetime.secondsToClockDuration(user_duration_format, select_day_time, true, true),
+                    face = Font:getFace("smallffont"),
+                },
+            },
+        }
+
+
+        local titles_group = HorizontalGroup:new{
+            align = "center",
+            LeftContainer:new{
+                dimen = Geom:new{ w = inner_width , h = height * (1/3) },
+                ProgressWidget:new{
+                    width = math.floor(inner_width * select_day_time / max_week_time),
+                    height = Screen:scaleBySize(14),
+                    percentage = 1.0,
+                    ticks = nil,
+                    last = nil,
+                    margin_h = 0,
+                    margin_v = 0,
+                }
+            },
+        }
+
+        local p = VerticalGroup:new{
+            align = "center",
+            BottomContainer:new{
+                dimen = Geom:new{ w = inner_width / 7.0, h = height * (1/3) * 7 * 2 + 7 * Screen:scaleBySize(self.stats_span) },
+                ProgressWidget:new{
+                    width = Screen:scaleBySize(14),
+                    height = math.floor((height * (1/3) * 7 * 2 + 7 * Screen:scaleBySize(self.stats_span)) * select_day_time / max_week_time) ,
+                    percentage = 1.0,
+                    ticks = nil,
+                    last = nil,
+                    margin_h = 0,
+                    margin_v = 0,
+                }
+            },
+            TextWidget:new{
+                padding = Size.padding.small,
+                text = date_format_show,
+                face = Font:getFace("smallffont", 10),
+                max_width = inner_width / 7.0
+            },
+            TextWidget:new{
+                padding = Size.padding.small,
+                text = datetime.secondsToClockDuration(user_duration_format, select_day_time, true, true),
+                face = Font:getFace("smallffont", 10),
+                max_width = inner_width / 7.0
+            }
+        }
+        table.insert(statistics_group, p)        
+
+        -- table.insert(statistics_group, total_group)
+        -- table.insert(statistics_group, titles_group)
+        -- table.insert(statistics_group, span_group)
+    end  --for i=1
+    table.insert(statistics_container, statistics_group)
+    return CenterContainer:new{
+        dimen = Geom:new{ w = self.screen_width, h = math.floor(self.screen_height * 0.5) },
+        statistics_container,
     }
 end
 
