@@ -1376,6 +1376,18 @@ Time is in hours and minutes.]]),
                     local doc_settings =  self.ui.doc_settings
                     logger.dbg("!!!!!!!!!!!!!!!!!!!", self.ui.doc_settings:readSetting("summary").modified, "!!!!!!!!!!!!!!!!!")
 
+                    local bookinfo_cache_location = DataStorage:getSettingsDir() .. "/bookinfo_cache.sqlite3"
+                    local book_db_conn = SQ3.open(bookinfo_cache_location)
+                    local result = book_db_conn:exec("SELECT directory, filename FROM bookinfo;")
+                    local book_dir, book_filename = result[1], result[2]
+                    for i=1, #book_filename do
+                        local book_path = book_dir[i] .. book_filename[i]
+                        if DocSettings:hasSidecarFile(book_path) then
+                            local summary = DocSettings:open(book_path):readSetting("summary")
+                            logger.dbg(book_filename[i], summary)
+                        end
+                    end
+
                 end,
                 enabled_func = function() return self:isEnabled() end,
             }
