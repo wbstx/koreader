@@ -624,6 +624,15 @@ To:
             end,
         })
     end
+    table.insert(self.menu_items.developer_options.sub_item_table, {
+        text = _("Anti-alias rounded corners"),
+        checked_func = function()
+            return G_reader_settings:nilOrTrue("anti_alias_ui")
+        end,
+        callback = function()
+            G_reader_settings:flipNilOrTrue("anti_alias_ui")
+        end,
+    })
     --- @note: Currently, only Kobo implements this quirk
     if Device:hasEinkScreen() and Device:isKobo() then
         table.insert(self.menu_items.developer_options.sub_item_table, {
@@ -812,11 +821,10 @@ Tap a book in the search results to open it.]]),
     for id, common_setting in pairs(dofile("frontend/ui/elements/common_info_menu_table.lua")) do
         self.menu_items[id] = common_setting
     end
-    -- insert common exit
+    -- insert common exit for filemanager
     for id, common_setting in pairs(dofile("frontend/ui/elements/common_exit_menu_table.lua")) do
         self.menu_items[id] = common_setting
     end
-
     if not Device:isTouchDevice() then
         -- add a shortcut on non touch-device
         -- because this menu is not accessible otherwise
@@ -925,13 +933,19 @@ function FileManagerMenu:exitOrRestart(callback, force)
     end
 end
 
-function FileManagerMenu:genMenu(tab_index)
+function FileManagerMenu:onShowMenu(tab_index)
     if self.tab_item_table == nil then
         self:setUpdateItemTable()
     end
-    if tab_index == nil then
+
+    if not tab_index then
         tab_index = G_reader_settings:readSetting("filemanagermenu_tab_index") or 1
     end
+
+    local menu_container = CenterContainer:new{
+        ignore = "height",
+        dimen = Screen:getSize(),
+    }
 
     local main_menu
     if Device:isTouchDevice() or Device:hasDPad() then
@@ -940,6 +954,7 @@ function FileManagerMenu:genMenu(tab_index)
             width = Screen:getWidth(),
             last_index = tab_index,
             tab_item_table = self.tab_item_table,
+            show_parent = menu_container,
         }
     else
         local Menu = require("ui/widget/menu")
@@ -947,23 +962,14 @@ function FileManagerMenu:genMenu(tab_index)
             title = _("File manager menu"),
             item_table = Menu.itemTableFromTouchMenu(self.tab_item_table),
             width = Screen:getWidth() - (Size.margin.fullscreen_popout * 2),
+            show_parent = menu_container,
         }
     end
+
     main_menu.close_callback = function()
         self:onCloseFileManagerMenu()
     end
-    return main_menu
-end
 
-function FileManagerMenu:onShowMenu(tab_index, main_menu)
-    if main_menu == nil then
-        main_menu = self:genMenu(tab_index)
-    end
-    local menu_container = CenterContainer:new{
-        ignore = "height",
-        dimen = Screen:getSize(),
-    }
-    main_menu.show_parent = menu_container
     menu_container[1] = main_menu
     -- maintain a reference to menu_container
     self.menu_container = menu_container
@@ -1025,8 +1031,8 @@ function FileManagerMenu:onSetDimensions(dimen)
 end
 
 function FileManagerMenu:onMenuSearch()
-    local main_menu = self:genMenu()
-    main_menu:onShowMenuSearch()
+    self:onShowMenu()
+    self.menu_container[1]:onShowMenuSearch()
 end
 
 function FileManagerMenu:registerToMainMenu(widget)
