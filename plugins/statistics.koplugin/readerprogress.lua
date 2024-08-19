@@ -1,3 +1,4 @@
+local BD = require("ui/bidi")
 local Blitbuffer = require("ffi/blitbuffer")
 local CenterContainer = require("ui/widget/container/centercontainer")
 local Device = require("device")
@@ -10,6 +11,7 @@ local HorizontalSpan = require("ui/widget/horizontalspan")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local LeftContainer = require("ui/widget/container/leftcontainer")
 local LineWidget = require("ui/widget/linewidget")
+local Math = require("optmath")
 local ProgressWidget = require("ui/widget/progresswidget")
 local Size = require("ui/size")
 local TextWidget = require("ui/widget/textwidget")
@@ -18,12 +20,85 @@ local TitleBar = require("ui/widget/titlebar")
 local UIManager = require("ui/uimanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
+local Widget = require("ui/widget/widget")
 local datetime = require("datetime")
 local _ = require("gettext")
 local Screen = Device.screen
 
 local LINE_COLOR = Blitbuffer.COLOR_GRAY_9
 local BG_COLOR = Blitbuffer.COLOR_LIGHT_GRAY
+
+local LineChartWidget = Widget:extend{
+    width = nil,
+    height = nil,
+    line_color = LINE_COLOR,
+    point_color = Blitbuffer.COLOR_GRAY_7,
+    nb_items = nil,
+    ratios = nil, -- table of 1...nb_items items, each with (0 <= value <= 1), denoting the point value
+    bottom_v_padding = 0,
+    -- params for rectangles
+    show_rectange = true,
+    shrink = 0.7 -- shrink the width of the rectangles 
+}
+
+function LineChartWidget:init()
+    self.dimen = Geom:new{w = self.width, h = self.height}
+    local item_width = math.floor(self.width / self.nb_items)
+    local nb_item_width_add1 = self.width - self.nb_items * item_width
+    local nb_item_width_add1_mod = math.floor(self.nb_items/nb_item_width_add1)
+    self.item_widths = {}
+
+    self.bottom_v_padding = self.height * 0.02
+
+    for n = 1, self.nb_items do
+        local w = item_width
+        if nb_item_width_add1 > 0 and n % nb_item_width_add1_mod == 0 then
+            w = w + 1
+            nb_item_width_add1 = nb_item_width_add1 - 1
+        end
+        table.insert(self.item_widths, w)
+    end
+    if BD.mirroredUILayout() then
+        self.do_mirror = true
+    end
+end
+
+function LineChartWidget:paintTo(bb, x, y)
+    local i_x = 0
+    for n = 1, self.nb_items do
+        if self.do_mirror then
+            n = self.nb_items - n + 1
+        end
+        local i_w = self.item_widths[n]
+        local ratio = self.ratios and self.ratios[n] or 0
+        local i_h = Math.round(ratio * (self.height - self.bottom_v_padding * 2.0))
+        if i_h == 0 and ratio > 0 then -- show at least 1px
+            i_h = 1
+        end
+        local i_y = (self.height - self.bottom_v_padding * 2.0) - i_h
+
+        local bottom_height = self.height - self.bottom_v_padding
+
+        bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 3.0, Blitbuffer.COLOR_GRAY_7)
+
+        if self.show_rectange then
+            if i_h > 0 then
+                bb:paintBorder(x + i_x + i_w * (1.0 - self.shrink) / 2.0, y + i_y, i_w * self.shrink, i_h, 2.0, LINE_COLOR)
+            end
+        end
+
+        local text = TextWidget:new{
+            text = "test",
+            face = Font:getFace("smallffont"),
+            max_width = i_w
+        }
+        text:paintTo(bb, x + i_x + (i_w - text:getSize().w)/ 2.0, y + bottom_height)
+
+        i_x = i_x + i_w
+    end
+end
+
+
 
 -- Oh, hey, this one actually *is* an InputContainer!
 local ReaderProgress = InputContainer:extend{
@@ -230,6 +305,8 @@ function ReaderProgress:genWeekStats(stats_day)
         },
     }
 
+    local line_chart_height = {}
+
     -- Lines have L/R self.padding. Make this section even more indented/padded inside the lines
     local inner_width = self.screen_width - 4*self.padding
     local j = 1
@@ -268,15 +345,26 @@ function ReaderProgress:genWeekStats(stats_day)
                 }
             },
         }
+
+        table.insert(line_chart_height, select_day_time / max_week_time * 0.9)
+
         table.insert(statistics_group, total_group)
         table.insert(statistics_group, titles_group)
         table.insert(statistics_group, span_group)
     end  --for i=1
     table.insert(statistics_container, statistics_group)
-    return CenterContainer:new{
-        dimen = Geom:new{ w = self.screen_width, h = math.floor(self.screen_height * 0.5) },
-        statistics_container,
+
+    return LineChartWidget:new{
+        width = self.screen_width,
+        height = math.floor(self.screen_height * 0.5),
+        nb_items = 7,
+        ratios = line_chart_height,
     }
+
+    -- return CenterContainer:new{
+    --     dimen = Geom:new{ w = self.screen_width, h = math.floor(self.screen_height * 0.5) },
+    --     statistics_container,
+    -- }
 end
 
 function ReaderProgress:genSummaryDay(width)
