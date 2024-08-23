@@ -35,6 +35,7 @@ local LineChartWidget = Widget:extend{
     point_color = Blitbuffer.COLOR_GRAY_7,
     nb_items = nil,
     ratios = nil, -- table of 1...nb_items items, each with (0 <= value <= 1), denoting the point value
+    x_axis = nil, -- values of x axis, nb_items items
     bottom_v_padding = 0,
     -- params for rectangles
     show_rectange = true,
@@ -48,6 +49,7 @@ function LineChartWidget:init()
     local nb_item_width_add1_mod = math.floor(self.nb_items/nb_item_width_add1)
     self.item_widths = {}
 
+    self.line_thickness = self.height * 0.002
     self.bottom_v_padding = self.height * 0.02
 
     for n = 1, self.nb_items do
@@ -65,17 +67,19 @@ end
 
 function LineChartWidget:paintTo(bb, x, y)
     local i_x = 0
+    local x_axis_start = 0
+    local x_axis_end = 0
     for n = 1, self.nb_items do
         if self.do_mirror then
             n = self.nb_items - n + 1
         end
         local i_w = self.item_widths[n]
         local ratio = self.ratios and self.ratios[n] or 0
-        local i_h = Math.round(ratio * (self.height - self.bottom_v_padding * 2.0))
+        local i_h = Math.round(ratio * (self.height - self.bottom_v_padding * 3.0))
         if i_h == 0 and ratio > 0 then -- show at least 1px
             i_h = 1
         end
-        local i_y = (self.height - self.bottom_v_padding * 2.0) - i_h
+        local i_y = (self.height - self.bottom_v_padding * 3.0) - i_h
 
         local bottom_height = self.height - self.bottom_v_padding
 
@@ -83,19 +87,32 @@ function LineChartWidget:paintTo(bb, x, y)
 
         if self.show_rectange then
             if i_h > 0 then
-                bb:paintBorder(x + i_x + i_w * (1.0 - self.shrink) / 2.0, y + i_y, i_w * self.shrink, i_h, 2.0, LINE_COLOR)
+                bb:paintBorder(x + i_x + i_w * (1.0 - self.shrink) / 2.0, y + i_y, i_w * self.shrink, i_h, self.line_thickness, LINE_COLOR)
             end
         end
 
         local text = TextWidget:new{
-            text = "test",
+            text = self.x_axis[n],
             face = Font:getFace("smallffont"),
             max_width = i_w
         }
         text:paintTo(bb, x + i_x + (i_w - text:getSize().w)/ 2.0, y + bottom_height)
+        
+        -- bb:paintRect(x + i_x + i_w / 2.0, y + bottom_height - self.bottom_v_padding, 2.0, 10.0, LINE_COLOR) -- downwards
+        bb:paintRect(x + i_x + i_w / 2.0, y + bottom_height - self.bottom_v_padding - self.line_thickness * 2.5, self.line_thickness, self.line_thickness * 5, LINE_COLOR) -- downwards
+    
+        if n == 1 then
+            x_axis_start = x + i_x + i_w / 2.0
+        end
+        if n == self.nb_items then
+            x_axis_end = x + i_x + i_w / 2.0
+        end
 
         i_x = i_x + i_w
     end
+
+    bb:paintRect(x_axis_start, y + self.height - 2 * self.bottom_v_padding, x_axis_end - x_axis_start + self.line_thickness, self.line_thickness, LINE_COLOR) -- x_axis
+
 end
 
 
@@ -109,6 +126,14 @@ function ReaderProgress:init()
     self.current_pages = tostring(self.current_pages)
     self.today_pages = tostring(self.today_pages)
     self.small_font_face = Font:getFace("smallffont")
+
+    -- cre = require("document/credocument"):engineInit()
+    -- local face_list = cre.getFontFaces()
+    -- font_filename, font_faceindex, is_monospace = cre.getFontFaceFilenameAndFaceIndex("Bookerly")
+    -- self.small_font_face = Font:getFace(font_filename, 12, font_faceindex)
+    -- print(font_filename)
+    -- print(self.small_font_face)
+
     self.medium_font_face = Font:getFace("ffont")
     self.large_font_face = Font:getFace("largeffont")
     self.screen_width = Screen:getWidth()
@@ -306,6 +331,7 @@ function ReaderProgress:genWeekStats(stats_day)
     }
 
     local line_chart_height = {}
+    local stat_date = {}
 
     -- Lines have L/R self.padding. Make this section even more indented/padded inside the lines
     local inner_width = self.screen_width - 4*self.padding
@@ -347,6 +373,7 @@ function ReaderProgress:genWeekStats(stats_day)
         }
 
         table.insert(line_chart_height, select_day_time / max_week_time * 0.9)
+        table.insert(stat_date,  string.sub(datetime.shortDayOfWeekToLongTranslation[os.date("%a", diff_time)], 1, 3) .. os.date(" %m-%d", diff_time))
 
         table.insert(statistics_group, total_group)
         table.insert(statistics_group, titles_group)
@@ -359,6 +386,7 @@ function ReaderProgress:genWeekStats(stats_day)
         height = math.floor(self.screen_height * 0.5),
         nb_items = 7,
         ratios = line_chart_height,
+        x_axis = stat_date
     }
 
     -- return CenterContainer:new{
