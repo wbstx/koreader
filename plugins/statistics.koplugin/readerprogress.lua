@@ -1,3 +1,4 @@
+local BD = require("ui/bidi")
 local Blitbuffer = require("ffi/blitbuffer")
 local CenterContainer = require("ui/widget/container/centercontainer")
 local Device = require("device")
@@ -10,6 +11,7 @@ local HorizontalSpan = require("ui/widget/horizontalspan")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local LeftContainer = require("ui/widget/container/leftcontainer")
 local LineWidget = require("ui/widget/linewidget")
+local Math = require("optmath")
 local ProgressWidget = require("ui/widget/progresswidget")
 local Size = require("ui/size")
 local TextWidget = require("ui/widget/textwidget")
@@ -18,12 +20,173 @@ local TitleBar = require("ui/widget/titlebar")
 local UIManager = require("ui/uimanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
+local Widget = require("ui/widget/widget")
 local datetime = require("datetime")
 local _ = require("gettext")
 local Screen = Device.screen
 
 local LINE_COLOR = Blitbuffer.COLOR_GRAY_9
 local BG_COLOR = Blitbuffer.COLOR_LIGHT_GRAY
+
+local LineChartWidget = Widget:extend{
+    width = nil,
+    height = nil,
+    line_color = LINE_COLOR,
+    point_color = Blitbuffer.COLOR_GRAY_7,
+    nb_items = nil,
+    ratios = nil, -- table of 1...nb_items items, each with (0 <= value <= 1), denoting the point value
+    x_axis = nil, -- values of x axis, nb_items items
+    bottom_v_padding = 0,
+    face = Font:getFace("smallffont"),
+    -- params for rectangles
+    show_rectange = true,
+    shrink = 0.7 -- shrink the width of the rectangles 
+}
+
+function LineChartWidget:init()
+    self.dimen = Geom:new{w = self.width, h = self.height}
+    local item_width = math.floor(self.width / self.nb_items)
+    local nb_item_width_add1 = self.width - self.nb_items * item_width
+    local nb_item_width_add1_mod = math.floor(self.nb_items/nb_item_width_add1)
+    self.item_widths = {}
+
+    self.line_thickness = self.height * 0.002
+    self.bottom_v_padding = self.height * 0.02
+
+    for n = 1, self.nb_items do
+        local w = item_width
+        if nb_item_width_add1 > 0 and n % nb_item_width_add1_mod == 0 then
+            w = w + 1
+            nb_item_width_add1 = nb_item_width_add1 - 1
+        end
+        table.insert(self.item_widths, w)
+    end
+    if BD.mirroredUILayout() then
+        self.do_mirror = true
+    end
+end
+
+function LineChartWidget:paintTo(bb, x, y)
+    local i_x = 0
+    local x_axis_start = 0
+    local x_axis_end = 0
+    local prev_px, prev_py = 0
+    
+    -- a list to save all painted 2D coordinates
+    local points = {}
+
+
+    for n = 1, self.nb_items do
+        if self.do_mirror then
+            n = self.nb_items - n + 1
+        end
+        local i_w = self.item_widths[n]
+        local ratio = self.ratios and self.ratios[n] or 0
+        local i_h = Math.round(ratio * (self.height - self.bottom_v_padding * 3.0))
+        if i_h == 0 and ratio > 0 then -- show at least 1px
+            i_h = 1
+        end
+        local i_y = (self.height - self.bottom_v_padding * 3.0) - i_h
+
+        local bottom_height = self.height - self.bottom_v_padding
+
+        bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_GRAY_7)
+        table.insert(points, {x + i_x + i_w / 2.0, y + i_y})
+
+        -- if n == 3 then
+        --     local next_height = (self.height - self.bottom_v_padding * 3.0) - Math.round(self.ratios[n+1] * (self.height - self.bottom_v_padding * 3.0))
+        --     local next_next_height = (self.height - self.bottom_v_padding * 3.0) - Math.round(self.ratios[n+2] * (self.height - self.bottom_v_padding * 3.0))
+
+        --     -- bb:paintQuadBezier(prev_px, prev_py, math.ceil(x + i_x + i_w / 2.0), math.ceil(y + i_y), x + i_x + i_w + i_w / 2.0, y + next_height, Blitbuffer.COLOR_GRAY_7, 3)
+
+        --     bb:paintCubicBezier(prev_px, prev_py, 
+        --                         x + i_x + i_w / 2.0, y + i_y, 
+        --                         x + i_x + i_w + i_w / 2.0, y + next_height, 
+        --                         x + i_x + 2 * i_w + i_w / 2.0, y + next_next_height, 
+        --                         Blitbuffer.COLOR_GRAY_7, 1)
+
+
+        --     -- bb:paintQuadBezier(prev_px, prev_py, x + 2 * ( i_x + i_w / 2.0), prev_py, x + i_x + i_w / 2.0, y + 100, Blitbuffer.COLOR_GRAY_7, 3)
+
+        --     -- bb:paintQuadBezierSegAA(prev_px, prev_py, x + i_x + i_w / 2.0, y + 100, x + 2 * ( i_x + i_w / 2.0), prev_py, 100, Blitbuffer.COLOR_GRAY_7, 3)
+
+        --     -- bb:paintCircle(prev_px, prev_py, 3.0, Blitbuffer.COLOR_BLACK)
+        --     -- bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_BLACK)
+        --     -- bb:paintCircle(x + i_x + i_w + i_w / 2.0, y + next_height, 11.0, Blitbuffer.COLOR_BLACK)
+
+        --     -- bb:paintCircle(x + p1_x, y + p1_y, 3.0, Blitbuffer.COLOR_BLACK)
+        --     -- bb:paintCircle(x + p2_x, y + p2_y, 3.0, Blitbuffer.COLOR_BLACK)
+        --     -- bb:paintCircle(x + p3_x, y + p3_y, 3.0, Blitbuffer.COLOR_BLACK)
+        --     -- bb:paintCircle(x + p4_x, y + p4_y, 3.0, Blitbuffer.COLOR_BLACK)
+        --     -- bb:paintCubicBezier(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x, p4_y, Blitbuffer.COLOR_GRAY_7, 3)
+
+
+        --     -- bb:paintQuadBezier(x + p1_x, y + p1_y, x + p2_x, y + p2_y, x + p3_x, y + p3_y, Blitbuffer.COLOR_GRAY_7, 3)
+        -- end
+
+        if self.show_rectange then
+            if i_h > 0 then
+                bb:paintBorder(x + i_x + i_w * (1.0 - self.shrink) / 2.0, y + i_y, i_w * self.shrink, i_h, self.line_thickness, LINE_COLOR)
+            end
+        end
+
+        local text = TextWidget:new{
+            text = self.x_axis[n],
+            face = self.face,
+            max_width = i_w
+        }
+        text:paintTo(bb, x + i_x + (i_w - text:getSize().w)/ 2.0, y + bottom_height)
+        
+        -- bb:paintRect(x + i_x + i_w / 2.0, y + bottom_height - self.bottom_v_padding, 2.0, 10.0, LINE_COLOR) -- downwards
+        bb:paintRect(x + i_x + i_w / 2.0, y + bottom_height - self.bottom_v_padding - self.line_thickness * 2.5, self.line_thickness, self.line_thickness * 5, LINE_COLOR) -- downwards
+    
+        if n == 1 then
+            x_axis_start = x + i_x + i_w / 2.0
+        end
+        if n == self.nb_items then
+            x_axis_end = x + i_x + i_w / 2.0
+        end
+
+        i_x = i_x + i_w
+    end
+
+    -- judge each point is the summit or trough
+    local results = {}
+    for i = 1, #points do
+        if i == 1 or i == #points then
+            table.insert(results, 1)
+        elseif points[i][2] < points[i-1][2] and points[i][2] < points[i+1][2] then
+            table.insert(results, 0)
+        elseif points[i][2] > points[i-1][2] and points[i][2] > points[i+1][2] then
+            table.insert(results, 0)
+        else
+            table.insert(results, 1)
+        end
+    end
+
+    -- insert the start point and end point to the list
+    table.insert(points, 1, {x, y + self.height - 2 * self.bottom_v_padding})
+    table.insert(points, {x + self.width, y + self.height - 2 * self.bottom_v_padding})
+    -- calculate the control points for the cubic bezier curve, so that the curve is smooth. keep the target always on the summit/trough of the curve
+    for i = 2, #points-2 do
+        local p1_x, p1_y = points[i][1], points[i][2]
+        local p2_x, p2_y = points[i][1] + (points[i+1][1] - points[i-1][1]) / 8, points[i][2] + (points[i+1][2] - points[i-1][2]) / 8 * results[i-1]
+        local p3_x, p3_y = points[i+1][1] - (points[i+2][1] - points[i][1]) / 8, points[i+1][2] - (points[i+2][2] - points[i][2]) / 8  * results[i]
+        local p4_x, p4_y = points[i+1][1], points[i+1][2]
+
+        -- Debug, visualize the control points
+        -- bb:paintCircle(p2_x, p2_y, 4.0, Blitbuffer.COLOR_GRAY_7)
+        -- bb:paintCircle(p3_x, p3_y, 4.0, Blitbuffer.COLOR_GRAY_7)
+
+        bb:paintCubicBezier(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x, p4_y, Blitbuffer.COLOR_GRAY_7, 1)
+    end
+
+
+    bb:paintRect(x_axis_start, y + self.height - 2 * self.bottom_v_padding, x_axis_end - x_axis_start + self.line_thickness, self.line_thickness, LINE_COLOR) -- x_axis
+
+end
+
+
 
 -- Oh, hey, this one actually *is* an InputContainer!
 local ReaderProgress = InputContainer:extend{
@@ -36,6 +199,16 @@ function ReaderProgress:init()
     self.small_font_face = Font:getFace("smallffont")
     self.medium_font_face = Font:getFace("ffont")
     self.large_font_face = Font:getFace("largeffont")
+
+    local small_font_face_setting = G_reader_settings:readSetting("reading_progress_font", "Default")
+    if small_font_face_setting ~= "Default" then
+        local cre = require("document/credocument"):engineInit()
+        local font_filename, font_faceindex, is_monospace = cre.getFontFaceFilenameAndFaceIndex(small_font_face_setting)
+        self.small_font_face = Font:getFace(font_filename, 15)
+        self.medium_font_face = Font:getFace(font_filename, 20)
+        self.large_font_face = Font:getFace(font_filename, 25)
+    end
+
     self.screen_width = Screen:getWidth()
     self.screen_height = Screen:getHeight()
     if self.screen_width < self.screen_height then
@@ -230,6 +403,9 @@ function ReaderProgress:genWeekStats(stats_day)
         },
     }
 
+    local line_chart_height = {}
+    local stat_date = {}
+
     -- Lines have L/R self.padding. Make this section even more indented/padded inside the lines
     local inner_width = self.screen_width - 4*self.padding
     local j = 1
@@ -249,7 +425,7 @@ function ReaderProgress:genWeekStats(stats_day)
                 TextWidget:new{
                     padding = Size.padding.small,
                     text = date_format_show .. " — " .. datetime.secondsToClockDuration(user_duration_format, select_day_time, true, true),
-                    face = Font:getFace("smallffont"),
+                    face = self.small_font_face,
                 },
             },
         }
@@ -268,15 +444,29 @@ function ReaderProgress:genWeekStats(stats_day)
                 }
             },
         }
+
+        table.insert(line_chart_height, select_day_time / max_week_time * 0.9)
+        table.insert(stat_date,  string.sub(datetime.shortDayOfWeekToLongTranslation[os.date("%a", diff_time)], 1, 3) .. os.date(" %m-%d", diff_time))
+
         table.insert(statistics_group, total_group)
         table.insert(statistics_group, titles_group)
         table.insert(statistics_group, span_group)
     end  --for i=1
     table.insert(statistics_container, statistics_group)
-    return CenterContainer:new{
-        dimen = Geom:new{ w = self.screen_width, h = math.floor(self.screen_height * 0.5) },
-        statistics_container,
+
+    return LineChartWidget:new{
+        width = self.screen_width,
+        height = math.floor(self.screen_height * 0.5),
+        nb_items = 7,
+        ratios = line_chart_height,
+        x_axis = stat_date,
+        face = self.small_font_face
     }
+
+    -- return CenterContainer:new{
+    --     dimen = Geom:new{ w = self.screen_width, h = math.floor(self.screen_height * 0.5) },
+    --     statistics_container,
+    -- }
 end
 
 function ReaderProgress:genSummaryDay(width)

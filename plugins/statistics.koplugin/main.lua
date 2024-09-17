@@ -7,6 +7,8 @@ local Device = require("device")
 local Dispatcher = require("dispatcher")
 local DocSettings = require("docsettings")
 local FFIUtil = require("ffi/util")
+local Font = require("ui/font")
+local FontList = require("fontlist")
 local InfoMessage = require("ui/widget/infomessage")
 local KeyValuePage = require("ui/widget/keyvaluepage")
 local Math = require("optmath")
@@ -1054,6 +1056,52 @@ function ReaderStatistics:getStatisticEnabledMenuItem()
 end
 
 function ReaderStatistics:addToMainMenu(menu_items)
+
+    local cre = require("document/credocument"):engineInit()
+    local face_list = cre.getFontFaces()
+    local face_table = {}
+    table.insert(face_table, 
+    {
+        text = "Default",
+        font_func = function ()
+            return Font:getFace("ffont")
+            
+        end,
+        callback = function()
+            G_reader_settings:saveSetting("reading_progress_font", "Default")
+        end,
+        checked_func = function()
+            return G_reader_settings:readSetting("reading_progress_font", "Default") == "Default"
+        end,
+        keep_menu_open = true,
+    })
+    for k, v in ipairs(face_list) do
+        local font_filename, font_faceindex, is_monospace = cre.getFontFaceFilenameAndFaceIndex(v)
+        table.insert(face_table, {
+            text_func = function()
+                local text = v
+                if font_filename and font_faceindex then
+                    text = FontList:getLocalizedFontName(font_filename, font_faceindex) or text
+                end
+                return text
+            end,
+            font_func = function(size)
+                if G_reader_settings:nilOrTrue("font_menu_use_font_face") then
+                    if font_filename and font_faceindex then
+                        return Font:getFace(font_filename, size, font_faceindex)
+                    end
+                end
+            end,
+            callback = function()
+                G_reader_settings:saveSetting("reading_progress_font", v)
+            end,
+            checked_func = function()
+                return v == G_reader_settings:readSetting("reading_progress_font", "Default")
+            end,
+            keep_menu_open = true,
+        })
+    end
+
     menu_items.statistics = {
         text = _("Reading statistics"),
         sub_item_table = {
@@ -1175,6 +1223,13 @@ The max value ensures a page you stay on for a long time (because you fell aslee
                         callback = function()
                             self.settings.calendar_browse_future_months = not self.settings.calendar_browse_future_months
                         end,
+                    },
+                    {
+                        text_func = function()
+                            local reading_progress_font = G_reader_settings:readSetting("reading_progress_font", "Default")
+                            return T(_("Reading Progress Font: %1"), reading_progress_font)
+                        end,
+                        sub_item_table = face_table,
                         separator = true,
                     },
                     {
