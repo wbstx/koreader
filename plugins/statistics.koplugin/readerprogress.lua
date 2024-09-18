@@ -75,7 +75,6 @@ function LineChartWidget:paintTo(bb, x, y)
     -- a list to save all painted 2D coordinates
     local points = {}
 
-
     for n = 1, self.nb_items do
         if self.do_mirror then
             n = self.nb_items - n + 1
@@ -90,7 +89,8 @@ function LineChartWidget:paintTo(bb, x, y)
 
         local bottom_height = self.height - self.bottom_v_padding
 
-        bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_GRAY_7)
+        -- bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_GRAY_7)
+        bb:paintCircleWidth(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_GRAY_7, 7.0)
         table.insert(points, {x + i_x + i_w / 2.0, y + i_y})
 
         -- if n == 3 then
@@ -170,15 +170,16 @@ function LineChartWidget:paintTo(bb, x, y)
     -- calculate the control points for the cubic bezier curve, so that the curve is smooth. keep the target always on the summit/trough of the curve
     for i = 2, #points-2 do
         local p1_x, p1_y = points[i][1], points[i][2]
-        local p2_x, p2_y = points[i][1] + (points[i+1][1] - points[i-1][1]) / 8, points[i][2] + (points[i+1][2] - points[i-1][2]) / 8 * results[i-1]
-        local p3_x, p3_y = points[i+1][1] - (points[i+2][1] - points[i][1]) / 8, points[i+1][2] - (points[i+2][2] - points[i][2]) / 8  * results[i]
+        -- no exceed x axis
+        local p2_x, p2_y = points[i][1] + (points[i+1][1] - points[i-1][1]) / 8, math.min(points[i][2] + (points[i+1][2] - points[i-1][2]) / 8 * results[i-1], y + self.height - 2 * self.bottom_v_padding)
+        local p3_x, p3_y = points[i+1][1] - (points[i+2][1] - points[i][1]) / 8, math.min(points[i+1][2] - (points[i+2][2] - points[i][2]) / 8  * results[i], y + self.height- 2 * self.bottom_v_padding)
         local p4_x, p4_y = points[i+1][1], points[i+1][2]
 
         -- Debug, visualize the control points
-        -- bb:paintCircle(p2_x, p2_y, 4.0, Blitbuffer.COLOR_GRAY_7)
-        -- bb:paintCircle(p3_x, p3_y, 4.0, Blitbuffer.COLOR_GRAY_7)
+        -- bb:paintCircleWidth(p2_x, p2_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
+        -- bb:paintCircleWidth(p3_x, p3_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
 
-        bb:paintCubicBezier(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x, p4_y, Blitbuffer.COLOR_GRAY_7, 1)
+        bb:paintCubicBezierWidth(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x, p4_y, Blitbuffer.COLOR_GRAY_7, 3)
     end
 
 
