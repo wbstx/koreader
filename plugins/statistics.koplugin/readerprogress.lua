@@ -27,6 +27,7 @@ local Screen = Device.screen
 
 local LINE_COLOR = Blitbuffer.COLOR_GRAY_9
 local BG_COLOR = Blitbuffer.COLOR_LIGHT_GRAY
+local WHITE_COLOR = Blitbuffer.COLOR_WHITE
 
 local LineChartWidget = Widget:extend{
     width = nil,
@@ -36,10 +37,11 @@ local LineChartWidget = Widget:extend{
     nb_items = nil,
     ratios = nil, -- table of 1...nb_items items, each with (0 <= value <= 1), denoting the point value
     x_axis = nil, -- values of x axis, nb_items items
+    y_value = nil, -- the value of y axis
     bottom_v_padding = 0,
     face = Font:getFace("smallffont"),
     -- params for rectangles
-    show_rectange = true,
+    show_rectange = false,
     shrink = 0.7 -- shrink the width of the rectangles 
 }
 
@@ -69,9 +71,7 @@ end
 function LineChartWidget:paintTo(bb, x, y)
     local i_x = 0
     local x_axis_start = 0
-    local x_axis_end = 0
-    local prev_px, prev_py = 0
-    
+    local x_axis_end = 0    
     -- a list to save all painted 2D coordinates
     local points = {}
 
@@ -89,40 +89,15 @@ function LineChartWidget:paintTo(bb, x, y)
 
         local bottom_height = self.height - self.bottom_v_padding
 
-        -- bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_GRAY_7)
-        bb:paintCircleWidth(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_GRAY_7, 7.0)
+        bb:paintCircleWidth(x + i_x + i_w / 2.0, y + i_y, 5.0, Blitbuffer.COLOR_GRAY_7, 5.0)
         table.insert(points, {x + i_x + i_w / 2.0, y + i_y})
 
-        -- if n == 3 then
-        --     local next_height = (self.height - self.bottom_v_padding * 3.0) - Math.round(self.ratios[n+1] * (self.height - self.bottom_v_padding * 3.0))
-        --     local next_next_height = (self.height - self.bottom_v_padding * 3.0) - Math.round(self.ratios[n+2] * (self.height - self.bottom_v_padding * 3.0))
-
-        --     -- bb:paintQuadBezier(prev_px, prev_py, math.ceil(x + i_x + i_w / 2.0), math.ceil(y + i_y), x + i_x + i_w + i_w / 2.0, y + next_height, Blitbuffer.COLOR_GRAY_7, 3)
-
-        --     bb:paintCubicBezier(prev_px, prev_py, 
-        --                         x + i_x + i_w / 2.0, y + i_y, 
-        --                         x + i_x + i_w + i_w / 2.0, y + next_height, 
-        --                         x + i_x + 2 * i_w + i_w / 2.0, y + next_next_height, 
-        --                         Blitbuffer.COLOR_GRAY_7, 1)
-
-
-        --     -- bb:paintQuadBezier(prev_px, prev_py, x + 2 * ( i_x + i_w / 2.0), prev_py, x + i_x + i_w / 2.0, y + 100, Blitbuffer.COLOR_GRAY_7, 3)
-
-        --     -- bb:paintQuadBezierSegAA(prev_px, prev_py, x + i_x + i_w / 2.0, y + 100, x + 2 * ( i_x + i_w / 2.0), prev_py, 100, Blitbuffer.COLOR_GRAY_7, 3)
-
-        --     -- bb:paintCircle(prev_px, prev_py, 3.0, Blitbuffer.COLOR_BLACK)
-        --     -- bb:paintCircle(x + i_x + i_w / 2.0, y + i_y, 7.0, Blitbuffer.COLOR_BLACK)
-        --     -- bb:paintCircle(x + i_x + i_w + i_w / 2.0, y + next_height, 11.0, Blitbuffer.COLOR_BLACK)
-
-        --     -- bb:paintCircle(x + p1_x, y + p1_y, 3.0, Blitbuffer.COLOR_BLACK)
-        --     -- bb:paintCircle(x + p2_x, y + p2_y, 3.0, Blitbuffer.COLOR_BLACK)
-        --     -- bb:paintCircle(x + p3_x, y + p3_y, 3.0, Blitbuffer.COLOR_BLACK)
-        --     -- bb:paintCircle(x + p4_x, y + p4_y, 3.0, Blitbuffer.COLOR_BLACK)
-        --     -- bb:paintCubicBezier(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x, p4_y, Blitbuffer.COLOR_GRAY_7, 3)
-
-
-        --     -- bb:paintQuadBezier(x + p1_x, y + p1_y, x + p2_x, y + p2_y, x + p3_x, y + p3_y, Blitbuffer.COLOR_GRAY_7, 3)
-        -- end
+        -- local read_time_text = TextWidget:new{
+        --     text = string.format("%02d mins", self.y_value[n]/60),
+        --     face = Font:getFace("smallffont", 10),
+        --     max_width = i_w
+        -- }
+        -- read_time_text:paintTo(bb, x + i_x + (i_w - read_time_text:getSize().w)/ 2.0, y + i_y - read_time_text:getSize().h - 10)
 
         if self.show_rectange then
             if i_h > 0 then
@@ -150,40 +125,99 @@ function LineChartWidget:paintTo(bb, x, y)
         i_x = i_x + i_w
     end
 
-    -- judge each point is the summit or trough
+    -- judge each point is the peak or trough
     local results = {}
     for i = 1, #points do
-        if i == 1 or i == #points then
-            table.insert(results, 1)
-        elseif points[i][2] < points[i-1][2] and points[i][2] < points[i+1][2] then
-            table.insert(results, 0)
-        elseif points[i][2] > points[i-1][2] and points[i][2] > points[i+1][2] then
-            table.insert(results, 0)
-        else
-            table.insert(results, 1)
+        if i == 1 then
+            if points[i][2] <= points[i+1][2] then
+                table.insert(results, "peak")
+            else
+                table.insert(results, "trough")
+            end
+        elseif i == #points then
+            if points[i][2] <= points[i-1][2] then
+                table.insert(results, "trough")
+            else
+                table.insert(results, "peak")
+            end
+        elseif points[i][2] <= points[i-1][2] and points[i][2] <= points[i+1][2] then
+            table.insert(results, "peak")
+        elseif points[i][2] >= points[i-1][2] and points[i][2] >= points[i+1][2] then
+            table.insert(results, "trough")
+        elseif points[i][2] >= points[i-1][2] and points[i][2] <= points[i+1][2] then
+            table.insert(results, "downhill")
+        elseif points[i][2] <= points[i-1][2] and points[i][2] >= points[i+1][2] then
+            table.insert(results, "uphill")
         end
     end
 
     -- insert the start point and end point to the list
-    table.insert(points, 1, {x, y + self.height - 2 * self.bottom_v_padding})
-    table.insert(points, {x + self.width, y + self.height - 2 * self.bottom_v_padding})
-    -- calculate the control points for the cubic bezier curve, so that the curve is smooth. keep the target always on the summit/trough of the curve
+    table.insert(points, 1, {x, points[1][2]})
+    table.insert(points, {x + self.width, points[#points][2]})
+
+    -- calculate the control points for the cubic bezier curve, so that the curve is smooth. keep the target always on the peak/trough of the curve
+    local interpolation_interval = 6
     for i = 2, #points-2 do
         local p1_x, p1_y = points[i][1], points[i][2]
-        -- no exceed x axis
-        local p2_x, p2_y = points[i][1] + (points[i+1][1] - points[i-1][1]) / 8, math.min(points[i][2] + (points[i+1][2] - points[i-1][2]) / 8 * results[i-1], y + self.height - 2 * self.bottom_v_padding)
-        local p3_x, p3_y = points[i+1][1] - (points[i+2][1] - points[i][1]) / 8, math.min(points[i+1][2] - (points[i+2][2] - points[i][2]) / 8  * results[i], y + self.height- 2 * self.bottom_v_padding)
+        local prev_level_off = (results[i-1] == "trough" or results[i-1] == "peak") and 1 or 0
+        local level_off = (results[i] == "trough" or results[i] == "peak") and 1 or 0
+        local p2_x, p2_y = points[i][1] + (points[i+1][1] - points[i-1][1]) / interpolation_interval, 
+                           math.min(points[i][2] + (points[i+1][2] - points[i-1][2]) / interpolation_interval * (1 - prev_level_off), y + self.height - 2 * self.bottom_v_padding)
+        local p3_x, p3_y = points[i+1][1] - (points[i+2][1] - points[i][1]) / interpolation_interval, 
+                           math.min(points[i+1][2] - (points[i+2][2] - points[i][2]) / interpolation_interval * (1 - level_off), y + self.height- 2 * self.bottom_v_padding)
         local p4_x, p4_y = points[i+1][1], points[i+1][2]
 
         -- Debug, visualize the control points
         -- bb:paintCircleWidth(p2_x, p2_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
         -- bb:paintCircleWidth(p3_x, p3_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
 
-        bb:paintCubicBezierWidth(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x, p4_y, Blitbuffer.COLOR_GRAY_7, 3)
+        bb:paintCubicBezierWidth(p1_x, p1_y, p2_x, p2_y, p3_x, p3_y, p4_x - 1, p4_y - 1, Blitbuffer.COLOR_GRAY_7, 2)
     end
 
-
     bb:paintRect(x_axis_start, y + self.height - 2 * self.bottom_v_padding, x_axis_end - x_axis_start + self.line_thickness, self.line_thickness, LINE_COLOR) -- x_axis
+
+    i_x = 0
+    for n = 1, self.nb_items do
+        if self.do_mirror then
+            n = self.nb_items - n + 1
+        end
+        local i_w = self.item_widths[n]
+        local ratio = self.ratios and self.ratios[n] or 0
+        local i_h = Math.round(ratio * (self.height - self.bottom_v_padding * 3.0))
+        if i_h == 0 and ratio > 0 then -- show at least 1px
+            i_h = 1
+        end
+        local i_y = (self.height - self.bottom_v_padding * 3.0) - i_h
+
+        local read_time_text = TextWidget:new{
+            text = string.format("%02d mins", self.y_value[n]/60),
+            face = Font:getFace("smallffont", 10),
+            max_width = i_w
+        }
+
+        local offset_x, offset_y = 0, 0
+        if results[n] == "downhill" then
+            offset_x = read_time_text:getSize().w / 2.0 + 10
+        elseif results[n] == "uphill" then
+            offset_x = -read_time_text:getSize().w / 2.0 - 10
+        elseif results[n] == "peak" then
+            offset_y = -read_time_text:getSize().h / 2.0 - 10
+        elseif results[n] == "trough" then
+            offset_y = read_time_text:getSize().h / 2.0 + 10
+        end
+
+        -- bb:paintRect(x + i_x + (i_w - read_time_text:getSize().w)/ 2.0 + offset_x, y + i_y - read_time_text:getSize().h / 2.0 + offset_y, read_time_text:getSize().w, read_time_text:getSize().h, LINE_COLOR)
+        read_time_text:paintTo(bb, x + i_x + (i_w - read_time_text:getSize().w)/ 2.0 + offset_x, y + i_y - read_time_text:getSize().h / 2.0 + offset_y)
+
+        if n == 1 then
+            x_axis_start = x + i_x + i_w / 2.0
+        end
+        if n == self.nb_items then
+            x_axis_end = x + i_x + i_w / 2.0
+        end
+
+        i_x = i_x + i_w
+    end
 
 end
 
@@ -382,6 +416,7 @@ function ReaderProgress:genWeekStats(stats_day)
     local max_week_time = -1
     local day_time
     for i=1, stats_day do
+        -- self.dates[i][2] = math.random(0, 7200)
         day_time = self.dates[i][2]
         if day_time > max_week_time then max_week_time = day_time end
     end
@@ -405,6 +440,7 @@ function ReaderProgress:genWeekStats(stats_day)
     }
 
     local line_chart_height = {}
+    local day_readtime = {}
     local stat_date = {}
 
     -- Lines have L/R self.padding. Make this section even more indented/padded inside the lines
@@ -447,6 +483,7 @@ function ReaderProgress:genWeekStats(stats_day)
         }
 
         table.insert(line_chart_height, select_day_time / max_week_time * 0.9)
+        table.insert(day_readtime, select_day_time)
         table.insert(stat_date,  string.sub(datetime.shortDayOfWeekToLongTranslation[os.date("%a", diff_time)], 1, 3) .. os.date(" %m-%d", diff_time))
 
         table.insert(statistics_group, total_group)
@@ -461,6 +498,7 @@ function ReaderProgress:genWeekStats(stats_day)
         nb_items = 7,
         ratios = line_chart_height,
         x_axis = stat_date,
+        y_value = day_readtime,
         face = self.small_font_face
     }
 
