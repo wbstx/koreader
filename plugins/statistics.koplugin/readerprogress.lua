@@ -127,7 +127,7 @@ function LineChartWidget:paintTo(bb, x, y)
             max_width = i_w
         }
         text:paintTo(bb, x + i_x + (i_w - text:getSize().w)/ 2.0 + self.left_padding, y + bottom_height)
-        bb:paintRect(x + i_x + i_w / 2.0 + self.left_padding, y + bottom_height - self.bottom_v_padding - self.line_thickness * 2.5, self.line_thickness, self.line_thickness * 5, LINE_COLOR) -- x axis ticks
+        -- bb:paintRect(x + i_x + i_w / 2.0 + self.left_padding, y + bottom_height - self.bottom_v_padding - self.line_thickness * 2.5, self.line_thickness, self.line_thickness * 5, LINE_COLOR) -- x axis ticks
     
         if n == 1 then
             x_axis_start = x + i_x + i_w / 2.0 + self.left_padding
@@ -164,7 +164,7 @@ function LineChartWidget:paintTo(bb, x, y)
         i_x = i_x + i_w
     end
 
-    bb:paintRect(x_axis_start, y + self.height - 2 * self.bottom_v_padding, x_axis_end - x_axis_start + self.line_thickness, self.line_thickness, LINE_COLOR) -- x axis
+    -- bb:paintRect(x_axis_start, y + self.height - 2 * self.bottom_v_padding, x_axis_end - x_axis_start + self.line_thickness, self.line_thickness, LINE_COLOR) -- x axis
     -- bb:paintRect(x_axis_start, y, self.line_thickness, self.height - 2 * self.bottom_v_padding, LINE_COLOR) -- y axis
 
     -- paint the line of the reading target
@@ -448,7 +448,7 @@ function ReaderProgress:genWeekStats(stats_day)
     local max_week_time = -1
     local day_time
     for i=1, stats_day do
-        self.dates[i][2] = math.random(0, 7200)
+        -- self.dates[i][2] = math.random(0, 7200)
         day_time = self.dates[i][2]
         if day_time > max_week_time then max_week_time = day_time end
     end
