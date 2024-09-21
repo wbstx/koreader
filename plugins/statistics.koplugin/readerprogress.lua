@@ -40,6 +40,7 @@ local LineChartWidget = Widget:extend{
     x_axis = nil, -- values of x axis, nb_items items
     y_value = nil, -- the value of y axis
     bottom_v_padding = 0,
+    reading_target = 0,
     face = Font:getFace("smallffont"),
     -- params for rectangles
     show_rectange = false,
@@ -166,8 +167,11 @@ function LineChartWidget:paintTo(bb, x, y)
     bb:paintRect(x_axis_start, y + self.height - 2 * self.bottom_v_padding, x_axis_end - x_axis_start + self.line_thickness, self.line_thickness, LINE_COLOR) -- x axis
     -- bb:paintRect(x_axis_start, y, self.line_thickness, self.height - 2 * self.bottom_v_padding, LINE_COLOR) -- y axis
 
+    -- paint the line of the reading target
+    local target_h = Math.round(self.reading_target * (self.height - self.bottom_v_padding * 3.0))
+    local target_y = (self.height - self.bottom_v_padding * 3.0) - target_h
     for i = x_axis_start, x_axis_end, 20 do
-        bb:paintRect(i, y + self.height / 2, 14, self.line_thickness, Blitbuffer.COLOR_DARK_GRAY)
+        bb:paintRect(i, y + target_y + self.read_text_padding, 14, self.line_thickness, Blitbuffer.COLOR_DARK_GRAY)
     end
 
     -- insert the start point and end point to the list
@@ -188,8 +192,8 @@ function LineChartWidget:paintTo(bb, x, y)
         local p4_x, p4_y = points[i+1][1], points[i+1][2]
 
         -- Debug, visualize the control points
-        bb:paintCircleWidth(p2_x, p2_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
-        bb:paintCircleWidth(p3_x, p3_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
+        -- bb:paintCircleWidth(p2_x, p2_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
+        -- bb:paintCircleWidth(p3_x, p3_y, 4.0, Blitbuffer.COLOR_GRAY_7, 4.0)
         -- bb:paintLineWidth(p2_x, p2_y, p3_x, p3_y, Blitbuffer.COLOR_GRAY_7, 2)
 
         table.insert(control_points_interval, {p2_x, p2_y})
@@ -219,15 +223,24 @@ function LineChartWidget:paintTo(bb, x, y)
             face = Font:getFace("smallffont", 10)
         }
 
+        local text_ratio = read_time_text:getSize().w / read_time_text:getSize().h
+        local text_offset = 10
+
         local offset_x, offset_y = 0, 0
-        if states[i] == "downhill" then
-            offset_x = read_time_text:getSize().w / 2.0 + 15
-        elseif states[i] == "uphill" then
-            offset_x = -read_time_text:getSize().w / 2.0 - 15
-        elseif states[i] == "peak" then
+        if states[i] == "peak" then
             offset_y = -read_time_text:getSize().h / 2.0 - 10
         elseif states[i] == "trough" then
             offset_y = read_time_text:getSize().h / 2.0 + 10
+        else
+            local k = math.atan2(control_points_interval[2 * (i-1) + 1][2] - control_points_interval[2 * (i-1)][2], 
+                                (control_points_interval[2 * (i-1) + 1][1] - control_points_interval[2 * (i-1)][1])) - math.pi / 2
+            if states[i] == "downhill" then
+                offset_x = (read_time_text:getSize().w / 2.0 + text_offset * text_ratio) * math.abs(math.cos(k))
+                offset_y = (-read_time_text:getSize().h / 2.0 - text_offset) * math.abs(math.sin(k))
+            elseif states[i] == "uphill" then
+                offset_x = (-read_time_text:getSize().w / 2.0 - text_offset * text_ratio) * math.abs(math.cos(k))
+                offset_y = (-read_time_text:getSize().h / 2.0 - text_offset) * math.abs(math.sin(k))
+            end
         end
 
         -- bb:paintRect(points[i][1] - read_time_text:getSize().w / 2.0 + offset_x + self.left_padding, points[i][2] - read_time_text:getSize().h / 2.0 + offset_y, read_time_text:getSize().w, read_time_text:getSize().h, LINE_COLOR)
@@ -235,9 +248,10 @@ function LineChartWidget:paintTo(bb, x, y)
 
     end
 
-    for i = 1, #points-2 do
-        bb:paintLineWidth(control_points_interval[2 * i][1], control_points_interval[2 * i][2], control_points_interval[2 * i + 1][1], control_points_interval[2 * i + 1][2], Blitbuffer.COLOR_GRAY_7, 2)
-    end
+    -- for i = 1, #points-2 do
+    --     bb:paintLineWidth(control_points_interval[2 * i][1], control_points_interval[2 * i][2], control_points_interval[2 * i + 1][1], control_points_interval[2 * i + 1][2], Blitbuffer.COLOR_GRAY_7, 2)
+    --     -- bb:paintLineWidth(points[i+1][1], points[i+1][2], points[i+1][1] + math.cos(k) * 30, points[i+1][2] + math.sin(k) * 30, Blitbuffer.COLOR_BLACK, 2)
+    -- end
 
 end
 
@@ -510,6 +524,7 @@ function ReaderProgress:genWeekStats(stats_day)
     end  --for i=1
     table.insert(statistics_container, statistics_group)
 
+    local reading_target = 60 * 60 / max_week_time * 0.9
     return LineChartWidget:new{
         width = self.screen_width,
         height = math.floor(self.screen_height * 0.5),
@@ -517,6 +532,7 @@ function ReaderProgress:genWeekStats(stats_day)
         ratios = line_chart_height,
         x_axis = stat_date,
         y_value = day_readtime,
+        reading_target = reading_target,
         face = self.small_font_face
     }
 
