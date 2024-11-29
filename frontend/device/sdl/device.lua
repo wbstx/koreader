@@ -50,7 +50,7 @@ local function getLinkOpener()
     return false
 end
 
--- thirdparty app support
+-- third-party app support
 local external = require("device/thirdparty"):new{
     dicts = getDesktopDicts(),
     check = function(self, app)
@@ -185,7 +185,7 @@ function Device:init()
         y = self.window.top,
         is_always_portrait = self.isAlwaysPortrait(),
     }
-    -- Pickup the updated window sizes if they were enforced in S.open (we'll get the coordinates via the inital SDL_WINDOWEVENT_MOVED)...
+    -- Pickup the updated window sizes if they were enforced in S.open (we'll get the coordinates via the initial SDL_WINDOWEVENT_MOVED)...
     self.window.width = self.screen.w
     self.window.height = self.screen.h
     self.powerd = require("device/sdl/powerd"):new{device = self}
@@ -193,7 +193,6 @@ function Device:init()
     local ok, re = pcall(self.screen.setWindowIcon, self.screen, "resources/koreader.png")
     if not ok then logger.warn(re) end
 
-    local input = require("ffi/input")
     self.input = require("device/input"):new{
         device = self,
         event_map = dofile("frontend/device/sdl/event_map_sdl2.lua"),
@@ -296,19 +295,6 @@ function Device:init()
                 UIManager:sendEvent(Event:new("TextInput", tostring(ev.value)))
             end
         end,
-        hasClipboardText = function()
-            return input.hasClipboardText()
-        end,
-        getClipboardText = function()
-            return input.getClipboardText()
-        end,
-        setClipboardText = function(text)
-            return input.setClipboardText(text)
-        end,
-        gameControllerRumble = function(left_intensity, right_intensity, duration)
-            return input.gameControllerRumble(left_intensity, right_intensity, duration)
-        end,
-        file_chooser = input.file_chooser,
     }
 
     self.keyboard_layout = dofile("frontend/device/sdl/keyboard_layout.lua")

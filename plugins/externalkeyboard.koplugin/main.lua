@@ -66,7 +66,7 @@ local function setupDebugFS()
     if not found then
         -- If we're not root, we won't be able to mount it
         if C.getuid() ~= 0 then
-            logger.dbg("ExternalKeyboard: Cannot mount debugfs (unpriviledged user)")
+            logger.dbg("ExternalKeyboard: Cannot mount debugfs (unprivileged user)")
             return false
         end
 
@@ -247,7 +247,7 @@ function ExternalKeyboard:_onEvdevInputRemove(event_path)
     end
 
     -- Close our Input handle on it
-    Device.input.close(event_path)
+    Device.input:close(event_path)
 
     ExternalKeyboard.keyboard_fds[event_path] = nil
     ExternalKeyboard.connected_keyboards = ExternalKeyboard.connected_keyboards - 1
@@ -291,7 +291,7 @@ end)
 local function findKeyboards()
     local keyboards = {}
 
-    local FBInkInput = ffi.load("fbink_input")
+    local FBInkInput = ffi.loadlib("fbink_input", 1)
     local dev_count = ffi.new("size_t[1]")
     local devices = FBInkInput.fbink_input_scan(C.INPUT_KEYBOARD, 0, 0, dev_count)
     if devices ~= nil then
@@ -312,7 +312,7 @@ end
 local function checkKeyboard(path)
     local keyboard
 
-    local FBInkInput = ffi.load("fbink_input")
+    local FBInkInput = ffi.loadlib("fbink_input", 1)
     local dev = FBInkInput.fbink_input_check(path, C.INPUT_KEYBOARD, 0, 0)
     if dev ~= nil then
         if dev.matched then
@@ -363,7 +363,7 @@ function ExternalKeyboard:setupKeyboard(data)
     logger.dbg("ExternalKeyboard:setupKeyboard", keyboard_info.name, "@", keyboard_info.event_path, "- has_dpad:", keyboard_info.has_dpad)
     -- Check if we already know about this event file.
     if ExternalKeyboard.keyboard_fds[keyboard_info.event_path] == nil then
-        local ok, fd = pcall(Device.input.fdopen, keyboard_info.event_fd, keyboard_info.event_path, keyboard_info.name)
+        local ok, fd = pcall(Device.input.fdopen, Device.input, keyboard_info.event_fd, keyboard_info.event_path, keyboard_info.name)
         if not ok then
             UIManager:show(InfoMessage:new{
                 text = "Error opening keyboard:\n" .. tostring(fd),

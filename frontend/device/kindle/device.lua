@@ -72,7 +72,7 @@ local function kindleGetCurrentProfile()
     if lipc_handle then
         local ha_input = lipc_handle:new_hasharray() -- an empty hash array since we only want to read
         local ha_result = lipc_handle:access_hash_property("com.lab126.wifid", "currentEssid", ha_input)
-        local profile = ha_result:to_table()[1] -- theres only a single element
+        local profile = ha_result:to_table()[1] -- there is only a single element
         ha_input:destroy()
         ha_result:destroy()
         lipc_handle:close()
@@ -476,8 +476,9 @@ end
 
 function Kindle:openInputDevices()
     -- Auto-detect input devices (via FBInk's fbink_input_scan)
-    local ok, FBInkInput = pcall(ffi.load, "fbink_input")
+    local ok, FBInkInput = pcall(ffi.loadlib, "fbink_input", 1)
     if not ok then
+        print("fbink_input not loaded:", FBInkInput)
         -- NOP fallback for the testsuite...
         FBInkInput = { fbink_input_scan = function() end }
     end
@@ -489,7 +490,7 @@ function Kindle:openInputDevices()
         for i = 0, tonumber(dev_count[0]) - 1 do
             local dev = devices[i]
             if dev.matched then
-                self.input.fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
+                self.input:fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
             end
         end
         C.free(devices)
@@ -498,11 +499,11 @@ function Kindle:openInputDevices()
         logger.warn("We failed to auto-detect the proper input devices, input handling may be inconsistent!")
         if self.touch_dev then
             -- We've got a preferred path specified for the touch panel
-            self.input.open(self.touch_dev)
+            self.input:open(self.touch_dev)
         else
             -- That generally works out well enough on legacy devices...
-            self.input.open("/dev/input/event0")
-            self.input.open("/dev/input/event1")
+            self.input:open("/dev/input/event0")
+            self.input:open("/dev/input/event1")
         end
     end
 
@@ -516,14 +517,14 @@ function Kindle:openInputDevices()
             for i = 0, tonumber(dev_count[0]) - 1 do
                 local dev = devices[i]
                 if dev.matched then
-                    self.input.fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
+                    self.input:fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
                 end
             end
             C.free(devices)
         end
     end
 
-    self.input.open("fake_events")
+    self.input:open("fake_events")
 end
 
 function Kindle:otaModel()
@@ -577,6 +578,13 @@ function Kindle:init()
 
     -- Auto-detect & open input devices
     self:openInputDevices()
+
+    -- Follow user preference for the hall effect sensor's state
+    if self.powerd:hasHallSensor() then
+        if G_reader_settings:has("kindle_hall_effect_sensor_enabled") then
+            self.powerd:onToggleHallSensor(G_reader_settings:readSetting("kindle_hall_effect_sensor_enabled"))
+        end
+    end
 
     Generic.init(self)
 end
@@ -1608,9 +1616,9 @@ function KindleScribe:init()
             logger.dbg("orientation_code =", orientation_code)
             local rotation_mode = 0
             if orientation_code then
-                if orientation_code == "U" or "L" then
+                if orientation_code == "U" or orientation_code == "L" then
                     rotation_mode = self.screen.DEVICE_ROTATED_UPRIGHT
-                elseif orientation_code == "D" or "R" then
+                elseif orientation_code == "D" or orientation_code == "R" then
                     rotation_mode = self.screen.DEVICE_ROTATED_UPSIDE_DOWN
                 end
             end

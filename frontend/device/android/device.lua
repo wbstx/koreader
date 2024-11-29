@@ -46,7 +46,7 @@ local function getCodename()
     return codename
 end
 
--- thirdparty app support
+-- third-party app support
 local external = require("device/thirdparty"):new{
     dicts = {
         { "Aard2", "Aard2", false, "itkach.aard2", "aard2" },
@@ -137,12 +137,6 @@ function Device:init()
     self.powerd = require("device/android/powerd"):new{device = self}
 
     local event_map = dofile("frontend/device/android/event_map.lua")
-
-    if android.prop.is_tolino then
-        -- dpad left/right as page back/forward
-        event_map[21] = "LPgBack"
-        event_map[22] = "LPgFwd"
-    end
 
     self.input = require("device/input"):new{
         device = self,
@@ -245,6 +239,11 @@ function Device:init()
             return android.setClipboardText(text)
         end,
     }
+
+    -- disable translation for specific models, where media keys follow gravity, see https://github.com/koreader/koreader/issues/12423
+    if android.prop.model == "moaanmix7" or android.prop.model == "xiaomi_reader" then
+        self.input:disableRotationMap()
+    end
 
     -- check if we have a keyboard
     if android.lib.AConfiguration_getKeyboard(android.app.config)
@@ -349,12 +348,7 @@ function Device:retrieveNetworkInfo()
             return _("Connected to mobile data network")
         elseif type == C.ANETWORK_ETHERNET then
             return _("Connected to Ethernet")
-        elseif type == C.ANETWORK_BLUETOOTH then
-            return _("Connected to Bluetooth")
-        elseif type == C.ANETWORK_VPN then
-            return _("Connected to VPN")
         end
-        return _("Unknown connection")
     end
 end
 

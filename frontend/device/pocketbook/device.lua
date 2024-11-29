@@ -52,7 +52,7 @@ local PocketBook = Generic:extend{
     -- instead of busy looping at 50Hz the way inkview insists on doing.
     -- In case this method fails (no root), we fallback to classic inkview api.
     raw_input = nil, --[[{
-        -- value or function to adjust touch matrix orientiation.
+        -- value or function to adjust touch matrix orientation.
         touch_rotation = -3+4,
         -- Works same as input.event_map, but for raw input EV_KEY translation
         keymap = { [scan] = event },
@@ -170,7 +170,7 @@ function PocketBook:init()
 
             return self._fb_init(fb, finfo, vinfo)
         end,
-        -- raw touch input orientiation is different from the screen
+        -- raw touch input orientation is different from the screen
         getTouchRotation = function(fb)
             if type(touch_rotation) == "function" then
                 return touch_rotation(self, fb:getRotationMode())
@@ -241,14 +241,17 @@ function PocketBook:init()
     -- NOTE: This all happens in ffi/input_pocketbook.lua
 
     self._model_init()
-    -- NOTE: This is the odd one out actually calling input.open as a *method*,
-    --       which the imp supports to get access to self.input.raw_input
-    if (not self.input.raw_input) or (not pcall(self.input.open, self.input)) then
+    -- NOTE: `self.input.open` is a method, and we want it to call `self.input.input.open`
+    -- with `self.input` as first argument, which the imp supports to get access to
+    -- `self.input.raw_input`, hence the double `self.input` arguments.
+    if (not self.input.raw_input) or (not pcall(self.input.open, self.input, self.input)) then
         inkview.OpenScreen()
         -- Raw mode open failed (no permissions?), so we'll run the usual way.
         -- Disable touch coordinate translation as inkview will do that.
         self.input.raw_input = nil
-        self.input:open()
+        -- Same as above, `self.input.open` will call `self.input.input.open`
+        -- with `self.input` as first argument.
+        self.input:open(self.input)
         touch_rotation = 0
     else
         self.canSuspend = yes
@@ -641,6 +644,21 @@ local PocketBook634 = PocketBook:extend{
     hasNaturalLight = yes,
 }
 
+-- PocketBook Verse Pro Color (PB634K3)
+local PocketBook634K3 = PocketBook:extend{
+    model = "PBVerseProColor",
+    display_dpi = 300,
+    hasColorScreen = yes,
+    canHWDither = yes, -- Adjust color saturation with inkview
+    canUseCBB = no, -- 24bpp
+    isAlwaysPortrait = yes,
+    hasNaturalLight = yes,
+}
+
+function PocketBook634K3._fb_init(fb, finfo, vinfo)
+    vinfo.bits_per_pixel = 24
+end
+
 -- PocketBook Aqua (640)
 local PocketBook640 = PocketBook:extend{
     model = "PBAqua",
@@ -872,6 +890,8 @@ elseif codename == "633" then
     return PocketBook633
 elseif codename == "634" then
     return PocketBook634
+elseif codename == "634K3" then
+    return PocketBook634K3
 elseif codename == "640" then
     return PocketBook640
 elseif codename == "641" then

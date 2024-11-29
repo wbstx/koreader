@@ -508,7 +508,7 @@ To:
                                 FFIUtil.purgeDir(cachedir)
                             end
                             lfs.mkdir(cachedir)
-                            -- Also remove from the Cache objet references to the cache files we've just deleted
+                            -- Also remove from the Cache object references to the cache files we've just deleted
                             local Cache = require("cache")
                             Cache.cached = {}
                             UIManager:askForRestart(_("Caches cleared. Please restart KOReader."))
@@ -794,7 +794,7 @@ To:
         end,
     }
 
-    self.menu_items.find_file = {
+    self.menu_items.file_search = {
         -- @translators Search for files by name.
         text = _("File search"),
         help_text = _([[Search a book by filename in the current or home folder and its subfolders.
@@ -807,7 +807,13 @@ The sorting order is the same as in filemanager.
 Tap a book in the search results to open it.]]),
         callback = function()
             self.ui.filesearcher:onShowFileSearch()
-        end
+        end,
+    }
+    self.menu_items.file_search_results = {
+        text = _("Last file search results"),
+        callback = function()
+            self.ui.filesearcher:onShowSearchResults()
+        end,
     }
 
     -- main menu tab

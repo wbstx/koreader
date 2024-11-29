@@ -8,7 +8,7 @@ ANDROID_APK = koreader-android-$(ANDROID_ARCH)$(KODEDUG_SUFFIX)-$(ANDROID_NAME).
 PHONY += run
 
 # Tools
-APKANALYZER ?= $(word 1,$(wildcard $(shell command -v apkanalyzer) $(ANDROID_SDK_ROOT)/tools/bin/apkanalyzer))
+APKANALYZER ?= $(ANDROID_SDK_ROOT)/cmdline-tools/latest/bin/apkanalyzer
 
 run: update
 	# get android app id
@@ -83,7 +83,6 @@ update: all
 	# binaries are stored as shared libraries to prevent W^X exception on Android 10+
 	# https://developer.android.com/about/versions/10/behavior-changes-10#execute-permission
 	llvm-strip --strip-unneeded $(INSTALL_DIR)/koreader/sdcv -o $(ANDROID_LIBS)/libsdcv.so
-	printf '%s\n' 'libs .' 'sdcv libsdcv.so' >$(ANDROID_ASSETS)/module/map.txt
 	# assets are compressed manually and stored inside the APK.
 	cd $(INSTALL_DIR)/koreader && \
 		./tools/mk7z.sh \

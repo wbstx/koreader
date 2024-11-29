@@ -862,8 +862,9 @@ function Kobo:init()
     self:initEventAdjustHooks()
 
     -- Auto-detect input devices (via FBInk's fbink_input_scan)
-    local ok, FBInkInput = pcall(ffi.load, "fbink_input")
+    local ok, FBInkInput = pcall(ffi.loadlib, "fbink_input", 1)
     if not ok then
+        print("fbink_input not loaded:", FBInkInput)
         -- NOP fallback for the testsuite...
         FBInkInput = { fbink_input_scan = NOP }
     end
@@ -880,9 +881,9 @@ function Kobo:init()
                 -- We need to single out whichever device provides pagination buttons or sleep cover events, as we'll want to tweak key repeat there...
                 -- The first one will do, as it's extremely likely to be event0, and that's pretty fairly set in stone on NTX boards.
                 if (bit.band(dev.type, C.INPUT_PAGINATION_BUTTONS) ~= 0 or bit.band(dev.type, C.INPUT_SLEEP_COVER) ~= 0) and not self.ntx_fd then
-                    self.ntx_fd = self.input.fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
+                    self.ntx_fd = self.input:fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
                 else
-                    self.input.fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
+                    self.input:fdopen(tonumber(dev.fd), ffi.string(dev.path), ffi.string(dev.name))
                 end
             end
         end
@@ -891,9 +892,9 @@ function Kobo:init()
         -- Auto-detection failed, warn and fall back to defaults
         logger.warn("We failed to auto-detect the proper input devices, input handling may be inconsistent!")
         -- Various HW Buttons, Switches & Synthetic NTX events
-        self.ntx_fd = self.input.open(self.ntx_dev)
+        self.ntx_fd = self.input:open(self.ntx_dev)
         -- Touch panel
-        self.input.open(self.touch_dev)
+        self.input:open(self.touch_dev)
     end
 
     -- NOTE: On devices with a gyro, there may be a dedicated input device outputting the raw accelerometer data
@@ -902,7 +903,7 @@ function Kobo:init()
     --       and it's usually *extremely* verbose, so it'd just be a waste of processing power.
     -- fake_events is only used for usb plug & charge events so far (generated via uevent, c.f., input/iput-kobo.h in base).
     -- NOTE: usb hotplug event is also available in /tmp/nickel-hardware-status (... but only when Nickel is running ;p)
-    self.input.open("fake_events")
+    self.input:open("fake_events")
 
     -- See if the device supports key repeat
     -- This is *not* behind a hasKeys check, because we mainly use it to stop SleepCover chatter,
@@ -975,6 +976,12 @@ function Kobo:init()
     -- Disable key repeat if requested
     if G_reader_settings:isTrue("input_no_key_repeat") then
         self:toggleKeyRepeat(false)
+    end
+
+    -- Switch to the proper packages on FW 5.x
+    -- NOTE: We don't distribute kobov4 binaries, the omission is on purpose.
+    if util.fileExists("/usr/bin/hwdetect.sh") then
+        self.ota_model = "kobov5"
     end
 
     -- Finally, Let Generic properly setup the standard stuff.
@@ -1335,6 +1342,14 @@ function Kobo:suspend()
         UIManager:unschedule(self.checkUnexpectedWakeup)
         self:scheduleUnexpectedWakeupGuard()
         return
+    end
+
+    -- Murder Wi-Fi (again, c.f., `Device:onPowerEvent`) if NetworkMgr is attempting to connect or currently connected...
+    -- (Most likely because of a rerunWhenOnline in a Suspend handler)
+    local network_mgr = require("ui/network/manager")
+    if network_mgr:isWifiOn() then
+        logger.info("Kobo suspend: had to kill Wi-Fi")
+        network_mgr:disableWifi()
     end
 
     logger.info("Kobo suspend: going to sleep . . .")

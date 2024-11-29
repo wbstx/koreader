@@ -125,7 +125,7 @@ function Remarkable:init()
     -- logger.info("PPID:")
     -- local parent_process = os.execute("echo $PPID")
     -- os.execute("ps | grep $PPID")
-    -- logger.info(string.format("parent proccess is oxide?: %s", parent_process_is_oxide))
+    -- logger.info(string.format("parent process is oxide?: %s", parent_process_is_oxide))
 
     self.screen = require("ffi/framebuffer_mxcfb"):new{device = self, debug = logger.dbg}
     self.powerd = require("device/remarkable/powerd"):new{
@@ -167,9 +167,9 @@ function Remarkable:init()
         self.input_ts = "/dev/input/touchscreen0"
     end
 
-    self.input.open(self.input_wacom) -- Wacom
-    self.input.open(self.input_ts) -- Touchscreen
-    self.input.open(self.input_buttons) -- Buttons
+    self.input:open(self.input_wacom) -- Wacom
+    self.input:open(self.input_ts) -- Touchscreen
+    self.input:open(self.input_buttons) -- Buttons
 
     local scalex = screen_width / self.mt_width
     local scaley = screen_height / self.mt_height
@@ -202,7 +202,7 @@ function Remarkable:init()
     end
 
     -- USB plug/unplug, battery charge/not charging are generated as fake events
-    self.input.open("fake_events")
+    self.input:open("fake_events")
 
     local rotation_mode = self.screen.DEVICE_ROTATED_UPRIGHT
     self.screen.native_rotation_mode = rotation_mode

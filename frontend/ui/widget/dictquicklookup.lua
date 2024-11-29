@@ -108,9 +108,15 @@ function DictQuickLookup:init()
         if Device:hasKeyboard() then
             self.key_events.ChangeToPrevDict = { { "Shift", "Left" } }
             self.key_events.ChangeToNextDict = { { "Shift", "Right" } }
+            self.key_events.LookupInputWordClear = { { Input.group.Alphabet }, event = "LookupInputWord" }
+            -- We need to concat here so that the 'del' event press, which propagates to inputText (desirable for previous key_event,
+            -- i.e., LookupInputWordClear) does not remove the last char of self.word
+            self.key_events.LookupInputWord = { { Device:hasSymKey() and "Del" or "Backspace" }, args = self.word .." " }
         elseif Device:hasScreenKB() then
             self.key_events.ChangeToPrevDict = { { "ScreenKB", "Left" } }
             self.key_events.ChangeToNextDict = { { "ScreenKB", "Right" } }
+            -- same case as hasKeyboard
+            self.key_events.LookupInputWord = { { "ScreenKB", "Back" }, args = self.word .." " }
         end
     end
     if Device:isTouchDevice() then
@@ -284,11 +290,11 @@ function DictQuickLookup:init()
         padding_left = Size.padding.small,
         callback = function()
             -- allow adjusting the queried word
-            self:lookupInputWord(self.word)
+            self:onLookupInputWord(self.word)
         end,
         hold_callback = function()
             -- allow adjusting the current result word
-            self:lookupInputWord(self.lookupword)
+            self:onLookupInputWord(self.lookupword)
         end,
         overlap_align = "right",
         show_parent = self,
@@ -857,13 +863,13 @@ function DictQuickLookup:update()
 
     -- Update main text widgets
     if self.is_html and self.shw_widget then
-        -- Re-use our ScrollHtmlWidget (self.shw_widget)
+        -- Reuse our ScrollHtmlWidget (self.shw_widget)
         -- NOTE: The recursive free via our WidgetContainer (self[1]) above already released the previous MµPDF document instance ;)
         self.text_widget.htmlbox_widget:setContent(self.definition, self:getHtmlDictionaryCss(), Screen:scaleBySize(self.dict_font_size))
         -- Scroll back to top
         self.text_widget:resetScroll()
     elseif not self.is_html and self.stw_widget then
-        -- Re-use our ScrollTextWidget (self.stw_widget)
+        -- Reuse our ScrollTextWidget (self.stw_widget)
         -- Update properties that may change across results (as done in DictQuickLookup:_instantiateScrollWidget())
         self.text_widget.text_widget.text = self.definition
         self.text_widget.text_widget.charlist = nil -- (required when use_xtext=false for proper re-init)
@@ -900,7 +906,7 @@ function DictQuickLookup:update()
 end
 
 function DictQuickLookup:getInitialVisibleArea()
-    -- Some positionning happens only at paintTo() time, but we want
+    -- Some positioning happens only at paintTo() time, but we want
     -- to know this before. So, do a bit like WidgetContainer does
     -- (without any MovableContainer offset)
     local dict_size = self.dict_frame:getSize()
@@ -1255,7 +1261,7 @@ function DictQuickLookup:onForwardingPanRelease(arg, ges)
     return self.movable:onMovablePanRelease(arg, ges)
 end
 
-function DictQuickLookup:lookupInputWord(hint)
+function DictQuickLookup:onLookupInputWord(hint)
     self.input_dialog = InputDialog:new{
         title = _("Enter a word or phrase to look up"),
         input = hint,
@@ -1331,12 +1337,12 @@ function DictQuickLookup:lookupWikipedia(get_fullpage, word, is_sane, lang)
             word = self.lookupword
             is_sane = true
         else
-            -- we use the original word that was querried
+            -- we use the original word that was queried
             word = self.word
             is_sane = false
         end
     end
-    -- Keep providing self.word_boxes so new windows keep being positionned to not hide it
+    -- Keep providing self.word_boxes so new windows keep being positioned to not hide it
     self.ui:handleEvent(Event:new("LookupWikipedia", word, is_sane, self.word_boxes, get_fullpage, lang))
 end
 

@@ -80,7 +80,9 @@ local settingsList = {
     touch_input_off = {category="none", event="IgnoreTouchInput", arg=true, title=_("Disable touch input"), device=true, condition=Device:isTouchDevice()},
     toggle_touch_input = {category="none", event="IgnoreTouchInput", title=_("Toggle touch input"), device=true, separator=true, condition=Device:isTouchDevice()},
     ----
-    swap_page_turn_buttons = {category="none", event="SwapPageTurnButtons", arg=true, title=_("Invert page turn buttons"), device=true, condition=Device:hasKeys(), separator=true},
+    swap_left_page_turn_buttons = {category="none", event="SwapPageTurnButtons", arg="left", title=_("Invert left-side page-turn buttons"), device=true, condition= Device:hasDPad() and Device:useDPadAsActionKeys()},
+    swap_right_page_turn_buttons = {category="none", event="SwapPageTurnButtons", arg="right", title=_("Invert right-side page-turn buttons"), device=true, condition= Device:hasDPad() and Device:useDPadAsActionKeys()},
+    swap_page_turn_buttons = {category="none", event="SwapPageTurnButtons", title=_("Invert page-turn buttons"), device=true, condition=Device:hasKeys(), separator=true},
     ----
     toggle_key_repeat = {category="none", event="ToggleKeyRepeat", title=_("Toggle key repeat"), device=true, condition=Device:hasKeys() and Device:canKeyRepeat(), separator=true},
     toggle_gsensor = {category="none", event="ToggleGSensor", title=_("Toggle accelerometer"), device=true, condition=Device:hasGSensor()},
@@ -128,13 +130,14 @@ local settingsList = {
     set_reverse_sorting = {category="string", event="SetReverseSorting", title=_("Reverse sorting"), args={true, false}, toggle={_("on"), _("off")}, filemanager=true},
     set_mixed_sorting = {category="string", event="SetMixedSorting", title=_("Folders and files mixed"), args={true, false}, toggle={_("on"), _("off")}, filemanager=true, separator=true},
     ----
-    folder_up = {category="none", event="FolderUp", title=_("Folder up"), filemanager=true},
     show_plus_menu = {category="none", event="ShowPlusMenu", title=_("Show plus menu"), filemanager=true},
     toggle_select_mode = {category="none", event="ToggleSelectMode", title=_("Toggle select mode"), filemanager=true},
     refresh_content = {category="none", event="RefreshContent", title=_("Refresh content"), filemanager=true},
     folder_shortcuts = {category="none", event="ShowFolderShortcutsDialog", title=_("Folder shortcuts"), filemanager=true},
     file_search = {category="none", event="ShowFileSearch", title=_("File search"), filemanager=true},
+    file_search_results = {category="none", event="ShowSearchResults", title=_("Last file search results"), filemanager=true},
     ----
+    folder_up = {category="none", event="FolderUp", title=_("Folder up"), filemanager=true},
     -- go_to
     -- back
 
@@ -310,6 +313,8 @@ local dispatcher_menu_order = {
     "toggle_touch_input",
     ----
     "swap_page_turn_buttons",
+    "swap_left_page_turn_buttons",
+    "swap_right_page_turn_buttons",
     ----
     "toggle_key_repeat",
     "toggle_gsensor",
@@ -358,13 +363,14 @@ local dispatcher_menu_order = {
     "set_reverse_sorting",
     "set_mixed_sorting",
     ----
-    "folder_up",
     "show_plus_menu",
     "toggle_select_mode",
     "refresh_content",
     "folder_shortcuts",
     "file_search",
+    "file_search_results",
     ----
+    "folder_up",
     -- "go_to"
     -- "back"
 
@@ -540,10 +546,14 @@ function Dispatcher:init()
                     end
                 elseif settingsList[name].category == "absolutenumber" then
                     if settingsList[name].min == nil then
-                        settingsList[name].min = option.args and option.args[1] or option.values[1]
+                        settingsList[name].min =
+                            (option.more_options_param and (option.more_options_param.value_min or option.more_options_param.left_min))
+                            or (option.args and option.args[1]) or option.values[1]
                     end
                     if settingsList[name].max == nil then
-                        settingsList[name].max = option.args and option.args[#option.args] or option.values[#option.values]
+                        settingsList[name].max =
+                            (option.more_options_param and (option.more_options_param.value_max or option.more_options_param.left_max))
+                            or (option.args and option.args[#option.args]) or option.values[#option.values]
                     end
                     if settingsList[name].default == nil then
                         settingsList[name].default = option.default_value
@@ -1084,9 +1094,7 @@ function Dispatcher:_showAsMenu(settings, exec_props)
             font_size = 22,
             callback = function()
                 UIManager:close(quickmenu)
-                UIManager:nextTick(function()
-                    Dispatcher:execute(settings, { qm_show = false })
-                end)
+                Dispatcher:execute(settings, { qm_show = false })
             end,
         }})
     end
@@ -1100,9 +1108,7 @@ function Dispatcher:_showAsMenu(settings, exec_props)
             font_bold = false,
             callback = function()
                 UIManager:close(quickmenu)
-                UIManager:nextTick(function()
-                    Dispatcher:execute({[v.key] = settings[v.key]})
-                end)
+                Dispatcher:execute({[v.key] = settings[v.key]})
                 if keep_open_on_apply and not util.stringStartsWith(v.key, "touch_input") then
                     quickmenu:setTitle(title)
                     UIManager:show(quickmenu)
@@ -1111,9 +1117,7 @@ function Dispatcher:_showAsMenu(settings, exec_props)
             hold_callback = function()
                 if v.key:sub(1, 13) == "profile_exec_" then
                     UIManager:close(quickmenu)
-                    UIManager:nextTick(function()
-                        UIManager:sendEvent(Event:new(settingsList[v.key].event, settingsList[v.key].arg, { qm_show = true }))
-                    end)
+                    UIManager:sendEvent(Event:new(settingsList[v.key].event, settingsList[v.key].arg, { qm_show = true }))
                 end
             end,
         }})
@@ -1156,6 +1160,9 @@ function Dispatcher:execute(settings, exec_props)
         end
         if Dispatcher:isActionEnabled(settingsList[k]) then
             Notification:setNotifySource(Notification.SOURCE_DISPATCHER)
+            if settings.settings and settings.settings.notify then
+                Notification:notify(T(_("Executing profile: %1"), settings.settings.name))
+            end
             if settingsList[k].configurable then
                 local value = v
                 if type(v) ~= "number" then
